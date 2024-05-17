@@ -7,7 +7,6 @@
 #include "wiringSerial.h"
 #include <unistd.h>
 
-
 using namespace ctre::phoenix6;
 using namespace std;
 
@@ -35,9 +34,11 @@ private:
     bool isEnabled = false;
     bool firstPress = true;
 
-    double deadzone = 0.2;
-    
+    double deadzone;
+
     int serialPort = 0;
+
+    int tick = 0;
 
 public:
     /* main robot interface */
@@ -63,28 +64,26 @@ void Robot::RobotInit()
     /* the left motor is CCW+ */
     left_fx_cfg.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
     left_fx_cfg.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    left_fx_cfg.CurrentLimits.SupplyCurrentLimit = 20;
+    left_fx_cfg.CurrentLimits.SupplyCurrentLimit = 33;
     left_fx_cfg.CurrentLimits.SupplyTimeThreshold = 0.1;
-    left_fx_cfg.CurrentLimits.SupplyCurrentThreshold = 10;
-    left_fx_cfg.CurrentLimits.StatorCurrentLimit = 20;
+    left_fx_cfg.CurrentLimits.SupplyCurrentThreshold = 30;
+    left_fx_cfg.CurrentLimits.StatorCurrentLimit = 33;
     left_fx_cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
     left_fx_cfg.CurrentLimits.StatorCurrentLimitEnable = true;
+
     leftLeader.GetConfigurator().Apply(left_fx_cfg);
-    
 
     /* the right motor is CW+ */
     right_fx_cfg.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
     right_fx_cfg.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    right_fx_cfg.CurrentLimits.SupplyCurrentLimit = 20;
+    right_fx_cfg.CurrentLimits.SupplyCurrentLimit = 33;
     right_fx_cfg.CurrentLimits.SupplyTimeThreshold = 0.1;
-    right_fx_cfg.CurrentLimits.SupplyCurrentThreshold = 10;
-    right_fx_cfg.CurrentLimits.StatorCurrentLimit = 20;
+    right_fx_cfg.CurrentLimits.SupplyCurrentThreshold = 30;
+    right_fx_cfg.CurrentLimits.StatorCurrentLimit = 33;
     right_fx_cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
     right_fx_cfg.CurrentLimits.StatorCurrentLimitEnable = true;
-    rightLeader.GetConfigurator().Apply(right_fx_cfg);
-
-    //initializes the serial port to read the thing
     
+    rightLeader.GetConfigurator().Apply(right_fx_cfg);
 }
 
 /**
@@ -94,8 +93,6 @@ void Robot::RobotPeriodic()
 {
     /* periodically check that the joystick is still good */
     joy.Periodic();
-
-    //leftLeader.Get();
 
     if(joy.GetButton(4) && firstPress){
         isEnabled = !isEnabled;
@@ -138,34 +135,57 @@ void Robot::EnabledInit() {
  */
 void Robot::EnabledPeriodic()
 {
-    /* arcade drive */
-    double speed = -joy.GetAxis(1, deadzone); // SDL_CONTROLLER_AXIS_LEFTY
+    //Ticks control how often the serial port flushes to prevent single-byte reads
+    tick ++;
+    if(tick>=10){
+        serialFlush(serialPort);
+        tick = 0;
+    }
+        
+    int m;
+    unsigned char buffer[5];
+    m = read(serialPort, buffer, sizeof (buffer) - 1);
+    double final;
+    if (m == 4) {
+        buffer[m] = 0;
+        printf("bytes read: %u serial data: %s", m, buffer);
+        printf("\n");
 
+        int hundredsDig = buffer[0] - '0';
+        int hundredsDigRes = 100*hundredsDig;
+        int tensDig = buffer[1] - '0';
+        int tensDigRes = 10*tensDig;
+        int onesDig = buffer[2] - '0';
+        int onesDigRes = onesDig;
+
+        final = hundredsDigRes + tensDigRes + onesDigRes;
+    }
+
+    
+    double speed = (final-177)/690; // SDL_CONTROLLER_AXIS_LEFTY
+    if(speed>1){
+        speed = 1;
+    } else if(speed<0){
+        speed = 0;
+    }
+
+    deadzone  = speed*0.8+0.1;
+    
+    if(speed<deadzone){
+        speed = 0;
+    }
+
+    cout << speed;
+    printf("\n");
+
+    cout << deadzone;
+    printf("\n");
+    
     leftOut.Output = speed;
     rightOut.Output = speed;
-
     leftLeader.SetControl(leftOut);
     rightLeader.SetControl(rightOut);
-
-    //cout << leftLeader.GetRotorVelocity();
-    serialFlush(serialPort);
-
-    if (joy.GetButton(5)) {
-        
-        int m;
-        unsigned char buffer[5];
-        m = read(serialPort, buffer, sizeof (buffer) - 1);
-
-        if (m != 0) {
-            buffer[m] = 0;
-            printf("bytes read: %u serial data: %s", m, buffer);
-            printf("\n");
-        }
-    }
-    //  if (serialDataAvail(serialPort)) {
-    //        cout << serialGetchar(serialPort);
-    //}
-}
+} 
 
 /**
  * Runs when transitioning from enabled to disabled,
