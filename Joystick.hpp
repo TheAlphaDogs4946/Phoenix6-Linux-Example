@@ -5,7 +5,10 @@
 #include <stdio.h>
 #include <chrono>
 #include <mutex>
+#include <pigpio.h>
+#include <cmath>
 
+using namespace std;
 /**
  * Manages a joystick using the SDL 2 library.
  *
@@ -159,14 +162,18 @@ public:
      * Returns the value of the given axis from
      * -1.0 to 1.0, or 0 in the case of an error.
      */
-    double GetAxis(int axis) const
+    double GetAxis(int axis, double deadzone) const
     {
         if (_joy) {
-            return SDL_JoystickGetAxis(_joy, axis) / 32768.0;
+            if (SDL_JoystickGetAxis(_joy, axis) / 32768.0 > -deadzone){
+                return 0.0;
+            } else {
+                return SDL_JoystickGetAxis(_joy, axis) / 32768.0;
+            }
         } else {
             return 0.0;
         }
-    }
+    }    
 
     /**
      * Returns whether this joystick is currently connected.

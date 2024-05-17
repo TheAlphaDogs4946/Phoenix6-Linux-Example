@@ -1,8 +1,15 @@
 #include "ctre/phoenix6/TalonFX.hpp"
 #include "RobotBase.hpp"
 #include "Joystick.hpp"
+#include "wiringPi.h"
+#include <iostream>
+#include <termios.h>
+#include "wiringSerial.h"
+#include <unistd.h>
+
 
 using namespace ctre::phoenix6;
+using namespace std;
 
 /**
  * This is the main robot. Put all actuators, sensors,
@@ -16,9 +23,7 @@ private:
 
     /* devices */
     hardware::TalonFX leftLeader{0, CANBUS_NAME};
-    hardware::TalonFX leftFollower{1, CANBUS_NAME};
-    hardware::TalonFX rightLeader{2, CANBUS_NAME};
-    hardware::TalonFX rightFollower{3, CANBUS_NAME};
+    hardware::TalonFX rightLeader{1, CANBUS_NAME};
 
     /* control requests */
     controls::DutyCycleOut leftOut{0};
@@ -26,6 +31,13 @@ private:
 
     /* joystick */
     Joystick joy{0};
+
+    bool isEnabled = false;
+    bool firstPress = true;
+
+    double deadzone = 0.2;
+    
+    int serialPort = 0;
 
 public:
     /* main robot interface */
@@ -45,19 +57,34 @@ public:
  */
 void Robot::RobotInit()
 {
-    configs::TalonFXConfiguration fx_cfg{};
+    configs::TalonFXConfiguration left_fx_cfg{};
+    configs::TalonFXConfiguration right_fx_cfg{};
 
     /* the left motor is CCW+ */
-    fx_cfg.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
-    leftLeader.GetConfigurator().Apply(fx_cfg);
+    left_fx_cfg.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
+    left_fx_cfg.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
+    left_fx_cfg.CurrentLimits.SupplyCurrentLimit = 20;
+    left_fx_cfg.CurrentLimits.SupplyTimeThreshold = 0.1;
+    left_fx_cfg.CurrentLimits.SupplyCurrentThreshold = 10;
+    left_fx_cfg.CurrentLimits.StatorCurrentLimit = 20;
+    left_fx_cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
+    left_fx_cfg.CurrentLimits.StatorCurrentLimitEnable = true;
+    leftLeader.GetConfigurator().Apply(left_fx_cfg);
+    
 
     /* the right motor is CW+ */
-    fx_cfg.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
-    rightLeader.GetConfigurator().Apply(fx_cfg);
+    right_fx_cfg.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
+    right_fx_cfg.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
+    right_fx_cfg.CurrentLimits.SupplyCurrentLimit = 20;
+    right_fx_cfg.CurrentLimits.SupplyTimeThreshold = 0.1;
+    right_fx_cfg.CurrentLimits.SupplyCurrentThreshold = 10;
+    right_fx_cfg.CurrentLimits.StatorCurrentLimit = 20;
+    right_fx_cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
+    right_fx_cfg.CurrentLimits.StatorCurrentLimitEnable = true;
+    rightLeader.GetConfigurator().Apply(right_fx_cfg);
 
-    /* set follower motors to follow leaders; do NOT oppose the leaders' inverts */
-    leftFollower.SetControl(controls::Follower{leftLeader.GetDeviceID(), false});
-    rightFollower.SetControl(controls::Follower{rightLeader.GetDeviceID(), false});
+    //initializes the serial port to read the thing
+    
 }
 
 /**
@@ -67,6 +94,16 @@ void Robot::RobotPeriodic()
 {
     /* periodically check that the joystick is still good */
     joy.Periodic();
+
+    //leftLeader.Get();
+
+    if(joy.GetButton(4) && firstPress){
+        isEnabled = !isEnabled;
+        firstPress = false;
+    }
+    if(!joy.GetButton(4) && !firstPress){
+        firstPress = true;
+    }
 }
 
 /**
@@ -74,16 +111,27 @@ void Robot::RobotPeriodic()
  */
 bool Robot::IsEnabled()
 {
-    /* enable while joystick is an Xbox controller (6 axes),
-     * and we are holding the right bumper */
-    if (joy.GetNumAxes() < 6) return false;
-    return joy.GetButton(5); // SDL_CONTROLLER_BUTTON_RIGHTSHOULDER
+    return isEnabled;
 }
 
 /**
  * Runs when transitioning from disabled to enabled.
  */
-void Robot::EnabledInit() {}
+void Robot::EnabledInit() {
+    struct termios options;
+    int fd = serialOpen("/dev/ttyACM1", 9600);
+    printf("%u", fd);
+    tcgetattr(fd, &options);
+    options.c_lflag |= ICANON;
+    options.c_iflag |= IGNCR;
+    options.c_cc [VMIN] = 0; // setting both of these to 0 is bad but it should make it work like i want it to
+    options.c_cc [VTIME] = 0;
+    options.c_cflag &= ~PARENB;     
+    options.c_cflag &= ~CSTOPB;     
+    options.c_cflag &= ~CRTSCTS;
+    tcsetattr(fd, TCSANOW | TCSAFLUSH, &options);
+    serialPort = fd;
+}
 
 /**
  * Runs periodically while enabled.
@@ -91,21 +139,41 @@ void Robot::EnabledInit() {}
 void Robot::EnabledPeriodic()
 {
     /* arcade drive */
-    double speed = -joy.GetAxis(1); // SDL_CONTROLLER_AXIS_LEFTY
-    double turn = joy.GetAxis(4); // SDL_CONTROLLER_AXIS_RIGHTX
+    double speed = -joy.GetAxis(1, deadzone); // SDL_CONTROLLER_AXIS_LEFTY
 
-    leftOut.Output = speed + turn;
-    rightOut.Output = speed - turn;
+    leftOut.Output = speed;
+    rightOut.Output = speed;
 
     leftLeader.SetControl(leftOut);
     rightLeader.SetControl(rightOut);
+
+    //cout << leftLeader.GetRotorVelocity();
+    serialFlush(serialPort);
+
+    if (joy.GetButton(5)) {
+        
+        int m;
+        unsigned char buffer[5];
+        m = read(serialPort, buffer, sizeof (buffer) - 1);
+
+        if (m != 0) {
+            buffer[m] = 0;
+            printf("bytes read: %u serial data: %s", m, buffer);
+            printf("\n");
+        }
+    }
+    //  if (serialDataAvail(serialPort)) {
+    //        cout << serialGetchar(serialPort);
+    //}
 }
 
 /**
  * Runs when transitioning from enabled to disabled,
  * including after robot startup.
  */
-void Robot::DisabledInit() {}
+void Robot::DisabledInit() {
+    serialClose(serialPort);
+}
 
 /**
  * Runs periodically while disabled.

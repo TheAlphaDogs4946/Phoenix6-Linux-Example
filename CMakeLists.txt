@@ -17,9 +17,11 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(phoenix6 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(SDL2 REQUIRED)
+find_package(WiringPi REQUIRED)
 
 # NOTE: The units library requires either <fmt/format.h> or <iostream>, use iostream
 add_definitions(-DUNIT_LIB_DISABLE_FMT -DUNIT_LIB_ENABLE_IOSTREAM)
+include_directories(${WIRINGPI_INCLUDE_DIRS})
 
 # Add all CPP files to the executable
 # Note: Users using GameController should swap out Joystick.cpp with GameController.cpp
@@ -29,3 +31,5 @@ add_executable(${PROJECT_NAME} main.cpp RobotBase.cpp Joystick.cpp)
 target_link_libraries(${PROJECT_NAME} phoenix6)
 target_link_libraries(${PROJECT_NAME} Threads::Threads)
 target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${WIRINGPI_LIBRARIES}) 
+target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT}) 
