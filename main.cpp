@@ -174,17 +174,21 @@ void Robot::EnabledPeriodic()
     if(speed<deadzone){
         speed = 0;
     }
-
+    cout << "Speed: ";
     cout << speed;
     printf("\n");
 
+    cout << "Deadzone: ";
     cout << deadzone;
     printf("\n");
-    
+
     leftOut.Output = speed;
     rightOut.Output = speed;
     leftLeader.SetControl(leftOut);
     rightLeader.SetControl(rightOut);
+
+    //cout << leftLeader.Get;
+    printf("\n");
 } 
 
 /**
