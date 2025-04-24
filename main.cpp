@@ -7,6 +7,7 @@
 #include <termios.h>
 #include "wiringSerial.h"
 #include <unistd.h>
+#include <units/current.h>
 
 #define ADS1115_ADDRESS 0x48
 
@@ -40,6 +41,9 @@ private:
     /* control requests */
     controls::DutyCycleOut leftOut{0};
     controls::DutyCycleOut rightOut{0};
+    controls::TorqueCurrentFOC torqueReq{units::current::ampere_t{0}};
+    
+    
     //controls::MusicTone music {456, 1};
 
     /* joystick */
@@ -237,6 +241,9 @@ void Robot::EnabledPeriodic()
     leftOut.Output = 0.02;
     
     leftLeader.SetControl(leftOut);
+
+    torqueReq.Output = units::current::ampere_t{1};
+    leftLeader.SetControl(torqueReq);
     //leftLeader.SetControl(controls::MusicTone);
 
     //leftLeader.GetGenericSignal("whatever goes here");
