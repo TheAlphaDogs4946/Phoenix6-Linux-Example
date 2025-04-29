@@ -18,7 +18,7 @@ class Robot : public RobotBase {
 private:
     /* This can be a CANivore name, CANivore serial number,
      * SocketCAN interface, or "*" to select any CANivore. */
-    static constexpr char const *CANBUS_NAME = "*";
+    static constexpr char const *CANBUS_NAME = "test0";
 
     /* devices */
     hardware::TalonFX leftLeader{0, CANBUS_NAME};
@@ -27,14 +27,10 @@ private:
     /* control requests */
     controls::DutyCycleOut leftOut{0};
     controls::DutyCycleOut rightOut{0};
-
-    /* joystick */
-    Joystick joy{0};
-
-    bool isEnabled = false;
-    bool firstPress = true;
+    controls::TorqueCurrentFOC torqueReq{units::current::ampere_t{0}};
 
     double deadzone;
+    double speed;
 
     int serialPort = 0;
 
@@ -92,15 +88,15 @@ void Robot::RobotInit()
 void Robot::RobotPeriodic()
 {
     /* periodically check that the joystick is still good */
-    joy.Periodic();
+    // joy.Periodic();
 
-    if(joy.GetButton(4) && firstPress){
-        isEnabled = !isEnabled;
-        firstPress = false;
-    }
-    if(!joy.GetButton(4) && !firstPress){
-        firstPress = true;
-    }
+    // if(joy.GetButton(4) && firstPress){
+    //     isEnabled = !isEnabled;
+    //     firstPress = false;
+    // }
+    // if(!joy.GetButton(4) && !firstPress){
+    //     firstPress = true;
+    // }
 }
 
 /**
@@ -108,7 +104,7 @@ void Robot::RobotPeriodic()
  */
 bool Robot::IsEnabled()
 {
-    return isEnabled;
+    return true;
 }
 
 /**
@@ -116,7 +112,7 @@ bool Robot::IsEnabled()
  */
 void Robot::EnabledInit() {
     struct termios options;
-    int fd = serialOpen("/dev/ttyACM1", 9600);
+    int fd = serialOpen("/dev/ttyACM0", 9600);
     printf("%u", fd);
     tcgetattr(fd, &options);
     options.c_lflag |= ICANON;
@@ -162,11 +158,14 @@ void Robot::EnabledPeriodic()
     }
 
     
-    double speed = (final-177)/690; // SDL_CONTROLLER_AXIS_LEFTY
+
+    if(final > 160 && final < 900){
+        speed = (final-177)/690; // SDL_CONTROLLER_AXIS_LEFTY
     if(speed>1){
         speed = 1;
     } else if(speed<0){
         speed = 0;
+    }
     }
 
     deadzone  = speed*0.8+0.1;
@@ -182,12 +181,17 @@ void Robot::EnabledPeriodic()
     cout << deadzone;
     printf("\n");
 
-    leftOut.Output = speed;
-    rightOut.Output = speed;
-    leftLeader.SetControl(leftOut);
-    rightLeader.SetControl(rightOut);
+    cout << "Pedal: ";
+    cout << final;
+    printf("\n");
 
-    //cout << leftLeader.Get;
+    leftOut.Output = speed;
+    torqueReq.Output = units::current::ampere_t{1};
+    leftLeader.SetControl(leftOut);
+    rightLeader.SetControl(leftOut);
+    // leftLeader.SetControl(torqueReq);
+    // rightLeader.SetControl(leftOut);
+
     printf("\n");
 } 
 
