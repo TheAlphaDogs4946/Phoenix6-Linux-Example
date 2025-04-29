@@ -32,7 +32,7 @@ class Robot : public RobotBase {
 private:
     /* This can be a CANivore name, CANivore serial number,
      * SocketCAN interface, or "*" to select any CANivore. */
-    static constexpr char const *CANBUS_NAME = "*";
+    static constexpr char const *CANBUS_NAME = "test0";
 
     /* devices */
     hardware::TalonFX leftLeader{0, CANBUS_NAME};
@@ -41,7 +41,7 @@ private:
     /* control requests */
     controls::DutyCycleOut leftOut{0};
     controls::DutyCycleOut rightOut{0};
-    controls::TorqueCurrentFOC torqueReq{units::current::ampere_t{0}};
+    // controls::TorqueCurrentFOC torqueReq{units::current::ampere_t{0}};
     
     
     //controls::MusicTone music {456, 1};
@@ -165,13 +165,13 @@ void Robot::EnabledPeriodic()
 {int config = CONFIG_OS_SINGLE | CONFIG_MUX_SINGLE_0 | CONFIG_GAIN_ONE | CONFIG_MODE_SINGLE | CONFIG_DR_1600SPS | CONFIG_COMP_QUE_DISABLE;
     wiringPiI2CWriteReg16(fd, CONFIG_REG, (config >> 8) | (config << 8));
 
-    delay(30);
+    // delay(30);
 
-    thingy = fd;
+    // thingy = fd;
 
-    int16_t value = wiringPiI2CReadReg16(thingy, CONVERSION_REG);
-    value = (value >> 8) | (value <<8);
-        std::cout << "OVERFLOW ADC Value: \t" << value << "\n";
+    // int16_t value = wiringPiI2CReadReg16(thingy, CONVERSION_REG);
+    // value = (value >> 8) | (value <<8);
+    //     // std::cout << "OVERFLOW ADC Value: \t" << value << "\n";
 
     // if(value > 0) {
     //     double newValue = ((double)value-6900)/14000.0;
@@ -233,18 +233,22 @@ void Robot::EnabledPeriodic()
     // cout << deadzone;
     // printf("\n");
 
-    // leftOut.Output = speed;
-    // rightOut.Output = speed;
+    // leftOut.Output = value;
+    // rightOut.Output = value;
     // leftLeader.SetControl(leftOut);
     // rightLeader.SetControl(rightOut);
 
-    leftOut.Output = 0.02;
+    leftOut.Output = 0.1;
+    rightOut.Output = 0.1;
     
     leftLeader.SetControl(leftOut);
+    // rightLeader.SetControl(rightOut);
 
-    torqueReq.Output = units::current::ampere_t{1};
-    leftLeader.SetControl(torqueReq);
-    //leftLeader.SetControl(controls::MusicTone);
+    // torqueReq.Output = units::current::ampere_t{0};
+    // leftLeader.SetControl(torqueReq);
+    // rightLeader.SetControl(torqueReq);
+
+    // leftLeader.SetControl(controls::MusicTone);
 
     //leftLeader.GetGenericSignal("whatever goes here");
 
