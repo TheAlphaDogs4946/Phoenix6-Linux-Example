@@ -27,6 +27,7 @@ private:
     /* control requests */
     controls::DutyCycleOut dutyOut{0};
     controls::TorqueCurrentFOC torqueReq{units::current::ampere_t{0}};
+    controls::VelocityTorqueCurrentFOC velocityReq{units::angular_velocity::revolutions_per_minute_t{0}};
 
     double deadzone;
     double speed;
@@ -59,22 +60,34 @@ void Robot::RobotInit()
     /* the left motor is CCW+ */
     leftConfig.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
     leftConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    leftConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{33};
-    leftConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{33};
+    leftConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{20};
+    leftConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{20};
     leftConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
     leftConfig.CurrentLimits.StatorCurrentLimitEnable = true;
+    leftConfig.Slot0.kP = 10;
+    leftConfig.Slot0.kI = 0;
+    leftConfig.Slot0.kD = 0;
+    leftConfig.Slot0.kV = 1;
+    leftConfig.Slot0.kS = 0;
 
     leftMotor.GetConfigurator().Apply(leftConfig);
 
     /* the right motor is CW+ */
     rightConfig.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
     rightConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    rightConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{33};
-    rightConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{33};
+    rightConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{20};
+    rightConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{20};
     rightConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
     rightConfig.CurrentLimits.StatorCurrentLimitEnable = true;
+    rightConfig.Slot0.kP = 10;
+    rightConfig.Slot0.kI = 0;
+    rightConfig.Slot0.kD = 0;
+    rightConfig.Slot0.kV = 1;
+    rightConfig.Slot0.kS = 0;
     
     rightMotor.GetConfigurator().Apply(rightConfig);
+
+    
 }
 
 /**
@@ -98,7 +111,7 @@ bool Robot::IsEnabled()
  */
 void Robot::EnabledInit() {
     struct termios options;
-    int fd = serialOpen("/dev/ttyACM0", 9600);
+    int fd = serialOpen("/dev/ttyACM1", 9600);
     printf("%u", fd);
     tcgetattr(fd, &options);
     options.c_lflag |= ICANON;
@@ -172,12 +185,55 @@ void Robot::EnabledPeriodic()
     cout << final;
     printf("\n");
 
+    cout << "Left Toruqe Current: ";
+    cout << leftMotor.GetTorqueCurrent();
+    printf("\n");
+
+    cout << "Left Stator Current: ";
+    cout << leftMotor.GetStatorCurrent();
+    printf("\n");
+
+    cout << "Left Motor Supply Current: ";
+    cout << leftMotor.GetSupplyCurrent();
+    printf("\n");
+
+    cout << "Left Motor Stall Current: ";
+    cout << leftMotor.GetMotorStallCurrent();
+    printf("\n");
+
+    cout << "Left Velocity: ";
+    cout << leftMotor.GetVelocity();
+    printf("\n");
+
+    cout << "Right Toruqe Current: ";
+    cout << rightMotor.GetTorqueCurrent();
+    printf("\n");
+
+    cout << "Right Stator Current: ";
+    cout << rightMotor.GetStatorCurrent();
+    printf("\n");
+
+    cout << "Right Motor Supply Current: ";
+    cout << rightMotor.GetSupplyCurrent();
+    printf("\n");
+
+    cout << "Right Motor Stall Current: ";
+    cout << rightMotor.GetMotorStallCurrent();
+    printf("\n");
+
+    cout << "Right Velocity: ";
+    cout << rightMotor.GetVelocity();
+    printf("\n");
+
     dutyOut.Output = speed;
-    torqueReq.Output = units::current::ampere_t{1};
-    leftMotor.SetControl(dutyOut);
-    rightMotor.SetControl(dutyOut);
-    // leftLeader.SetControl(torqueReq);
-    // rightLeader.SetControl(leftOut);
+    torqueReq.Output = units::current::ampere_t{speed*10};
+    velocityReq.Velocity = units::angular_velocity::revolutions_per_minute_t{speed*6000};
+    // leftMotor.SetControl(dutyOut);
+    // rightMotor.SetControl(dutyOut);
+    // leftMotor.SetControl(torqueReq);
+    // rightMotor.SetControl(torqueReq);
+    leftMotor.SetControl(velocityReq);
+    rightMotor.SetControl(velocityReq);
 
     printf("\n");
 } 
