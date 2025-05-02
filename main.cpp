@@ -21,12 +21,11 @@ private:
     static constexpr char const *CANBUS_NAME = "test0";
 
     /* devices */
-    hardware::TalonFX leftLeader{0, CANBUS_NAME};
-    hardware::TalonFX rightLeader{1, CANBUS_NAME};
+    hardware::TalonFX leftMotor{0, CANBUS_NAME};
+    hardware::TalonFX rightMotor{1, CANBUS_NAME};
 
     /* control requests */
-    controls::DutyCycleOut leftOut{0};
-    controls::DutyCycleOut rightOut{0};
+    controls::DutyCycleOut dutyOut{0};
     controls::TorqueCurrentFOC torqueReq{units::current::ampere_t{0}};
 
     double deadzone;
@@ -54,32 +53,28 @@ public:
  */
 void Robot::RobotInit()
 {
-    configs::TalonFXConfiguration left_fx_cfg{};
-    configs::TalonFXConfiguration right_fx_cfg{};
+    configs::TalonFXConfiguration leftConfig{};
+    configs::TalonFXConfiguration rightConfig{};
 
     /* the left motor is CCW+ */
-    left_fx_cfg.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
-    left_fx_cfg.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    left_fx_cfg.CurrentLimits.SupplyCurrentLimit = 33;
-    left_fx_cfg.CurrentLimits.SupplyTimeThreshold = 0.1;
-    left_fx_cfg.CurrentLimits.SupplyCurrentThreshold = 30;
-    left_fx_cfg.CurrentLimits.StatorCurrentLimit = 33;
-    left_fx_cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
-    left_fx_cfg.CurrentLimits.StatorCurrentLimitEnable = true;
+    leftConfig.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
+    leftConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
+    leftConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{33};
+    leftConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{33};
+    leftConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+    leftConfig.CurrentLimits.StatorCurrentLimitEnable = true;
 
-    leftLeader.GetConfigurator().Apply(left_fx_cfg);
+    leftMotor.GetConfigurator().Apply(leftConfig);
 
     /* the right motor is CW+ */
-    right_fx_cfg.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
-    right_fx_cfg.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    right_fx_cfg.CurrentLimits.SupplyCurrentLimit = 33;
-    right_fx_cfg.CurrentLimits.SupplyTimeThreshold = 0.1;
-    right_fx_cfg.CurrentLimits.SupplyCurrentThreshold = 30;
-    right_fx_cfg.CurrentLimits.StatorCurrentLimit = 33;
-    right_fx_cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
-    right_fx_cfg.CurrentLimits.StatorCurrentLimitEnable = true;
+    rightConfig.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
+    rightConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
+    rightConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{33};
+    rightConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{33};
+    rightConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+    rightConfig.CurrentLimits.StatorCurrentLimitEnable = true;
     
-    rightLeader.GetConfigurator().Apply(right_fx_cfg);
+    rightMotor.GetConfigurator().Apply(rightConfig);
 }
 
 /**
@@ -87,16 +82,7 @@ void Robot::RobotInit()
  */
 void Robot::RobotPeriodic()
 {
-    /* periodically check that the joystick is still good */
-    // joy.Periodic();
-
-    // if(joy.GetButton(4) && firstPress){
-    //     isEnabled = !isEnabled;
-    //     firstPress = false;
-    // }
-    // if(!joy.GetButton(4) && !firstPress){
-    //     firstPress = true;
-    // }
+    
 }
 
 /**
@@ -137,6 +123,7 @@ void Robot::EnabledPeriodic()
         serialFlush(serialPort);
         tick = 0;
     }
+    int n;
         
     int m;
     unsigned char buffer[5];
@@ -185,10 +172,10 @@ void Robot::EnabledPeriodic()
     cout << final;
     printf("\n");
 
-    leftOut.Output = speed;
+    dutyOut.Output = speed;
     torqueReq.Output = units::current::ampere_t{1};
-    leftLeader.SetControl(leftOut);
-    rightLeader.SetControl(leftOut);
+    leftMotor.SetControl(dutyOut);
+    rightMotor.SetControl(dutyOut);
     // leftLeader.SetControl(torqueReq);
     // rightLeader.SetControl(leftOut);
 
@@ -208,8 +195,8 @@ void Robot::DisabledInit() {
  */
 void Robot::DisabledPeriodic()
 {
-    leftLeader.SetControl(controls::NeutralOut{});
-    rightLeader.SetControl(controls::NeutralOut{});
+    leftMotor.SetControl(controls::NeutralOut{});
+    rightMotor.SetControl(controls::NeutralOut{});
 }
 
 /* ------ main function ------ */

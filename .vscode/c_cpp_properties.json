@@ -4,7 +4,11 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/usr/include/phoenix6"
+                "/usr/include",
+                "/usr/include/SDL2",
+                "/usr/include/arm-linux-gnueabihf",
+                "/usr/include/phoenix6",
+                "/home/alpha-dogs/WiringPi"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

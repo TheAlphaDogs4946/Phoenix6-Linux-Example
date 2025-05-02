@@ -17,7 +17,9 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(phoenix6 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(SDL2 REQUIRED)
-find_package(WiringPi REQUIRED)
+include_directories(/usr/include)
+link_libraries(wiringPi)
+
 
 # NOTE: The units library requires either <fmt/format.h> or <iostream>, use iostream
 add_definitions(-DUNIT_LIB_DISABLE_FMT -DUNIT_LIB_ENABLE_IOSTREAM)
