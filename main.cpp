@@ -30,7 +30,7 @@ private:
     controls::VelocityTorqueCurrentFOC velocityReq{units::angular_velocity::revolutions_per_minute_t{0}};
 
     double deadzone;
-    double speed;
+    double pedalVal;
 
     int serialPort = 0;
 
@@ -60,11 +60,11 @@ void Robot::RobotInit()
     /* the left motor is CCW+ */
     leftConfig.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
     leftConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    leftConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{20};
-    leftConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{20};
+    leftConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{22};
+    leftConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{22};
     leftConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
     leftConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-    leftConfig.Slot0.kP = 10;
+    leftConfig.Slot0.kP = 6;
     leftConfig.Slot0.kI = 0;
     leftConfig.Slot0.kD = 0;
     leftConfig.Slot0.kV = 1;
@@ -75,11 +75,11 @@ void Robot::RobotInit()
     /* the right motor is CW+ */
     rightConfig.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
     rightConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    rightConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{20};
-    rightConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{20};
+    rightConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{22};
+    rightConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{22};
     rightConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
     rightConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-    rightConfig.Slot0.kP = 10;
+    rightConfig.Slot0.kP = 6;
     rightConfig.Slot0.kI = 0;
     rightConfig.Slot0.kD = 0;
     rightConfig.Slot0.kV = 1;
@@ -158,23 +158,19 @@ void Robot::EnabledPeriodic()
     }
 
     
+    double motorSpeed = (leftMotor.GetVelocity().GetValueAsDouble() + rightMotor.GetVelocity().GetValueAsDouble())/2;
 
     if(final > 160 && final < 900){
-        speed = (final-177)/690; // SDL_CONTROLLER_AXIS_LEFTY
-    if(speed>1){
-        speed = 1;
-    } else if(speed<0){
-        speed = 0;
+        pedalVal = (final-177)/690; // SDL_CONTROLLER_AXIS_LEFTY
+    if(pedalVal>1){
+        pedalVal = 1;
+    } else if(pedalVal<0){
+        pedalVal = 0;
     }
     }
 
-    deadzone  = speed*0.8+0.1;
-    
-    if(speed<deadzone){
-        speed = 0;
-    }
     cout << "Speed: ";
-    cout << speed;
+    cout << pedalVal;
     printf("\n");
 
     cout << "Deadzone: ";
@@ -225,15 +221,19 @@ void Robot::EnabledPeriodic()
     cout << rightMotor.GetVelocity();
     printf("\n");
 
-    dutyOut.Output = speed;
-    torqueReq.Output = units::current::ampere_t{speed*10};
-    velocityReq.Velocity = units::angular_velocity::revolutions_per_minute_t{speed*6000};
-    // leftMotor.SetControl(dutyOut);
-    // rightMotor.SetControl(dutyOut);
-    // leftMotor.SetControl(torqueReq);
-    // rightMotor.SetControl(torqueReq);
-    leftMotor.SetControl(velocityReq);
-    rightMotor.SetControl(velocityReq);
+    if(pedalVal > 0.4){
+        double upperMappedPedal = (pedalVal-0.4)/0.6;
+        torqueReq.Output = units::current::ampere_t{upperMappedPedal*22};
+        leftMotor.SetControl(torqueReq);
+        rightMotor.SetControl(torqueReq);
+    }else if(pedalVal <=0.4 && pedalVal >= 0.3) {
+        leftMotor.SetControl(controls::CoastOut{});
+        rightMotor.SetControl(controls::CoastOut{});
+    } else {
+        velocityReq.Velocity = units::angular_velocity::revolutions_per_minute_t{((pedalVal/0.3) * motorSpeed)*60};
+        leftMotor.SetControl(velocityReq);
+        rightMotor.SetControl(velocityReq);
+    }
 
     printf("\n");
 } 
