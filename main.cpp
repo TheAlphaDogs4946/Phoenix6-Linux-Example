@@ -230,7 +230,11 @@ void Robot::EnabledPeriodic()
         leftMotor.SetControl(controls::CoastOut{});
         rightMotor.SetControl(controls::CoastOut{});
     } else {
-        velocityReq.Velocity = units::angular_velocity::revolutions_per_minute_t{((pedalVal/0.3) * motorSpeed)*60};
+        if(motorSpeed >0){
+            velocityReq.Velocity = units::angular_velocity::revolutions_per_minute_t{pedalVal*6000};
+        } else {
+            velocityReq.Velocity = units::angular_velocity::revolutions_per_minute_t{0};
+        }
         leftMotor.SetControl(velocityReq);
         rightMotor.SetControl(velocityReq);
     }
