@@ -36,6 +36,11 @@ private:
 
     int tick = 0;
 
+    int supplyCurrentLimit = 65;
+    int statorCurrentLimit = 100;
+    //May 7, test 1, 55 amps, regen ended at dumpster
+    //May 7, test 2, 55 amps, 10 P, regen ended at dumpster
+
 public:
     /* main robot interface */
     void RobotInit() override;
@@ -58,31 +63,35 @@ void Robot::RobotInit()
     configs::TalonFXConfiguration rightConfig{};
 
     /* the left motor is CCW+ */
-    leftConfig.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
+    leftConfig.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
     leftConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    leftConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{22};
-    leftConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{22};
+    leftConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{supplyCurrentLimit};
+    leftConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{statorCurrentLimit};
     leftConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
     leftConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-    leftConfig.Slot0.kP = 6;
+    leftConfig.TorqueCurrent.PeakForwardTorqueCurrent = units::current::ampere_t{85};
+    leftConfig.TorqueCurrent.PeakReverseTorqueCurrent = units::current::ampere_t{85};
+    leftConfig.Slot0.kP = 10;
     leftConfig.Slot0.kI = 0;
     leftConfig.Slot0.kD = 0;
-    leftConfig.Slot0.kV = 1;
+    leftConfig.Slot0.kV = 0;
     leftConfig.Slot0.kS = 0;
 
     leftMotor.GetConfigurator().Apply(leftConfig);
 
     /* the right motor is CW+ */
-    rightConfig.MotorOutput.Inverted = signals::InvertedValue::Clockwise_Positive;
+    rightConfig.MotorOutput.Inverted = signals::InvertedValue::CounterClockwise_Positive;
     rightConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Coast;
-    rightConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{22};
-    rightConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{22};
+    rightConfig.CurrentLimits.SupplyCurrentLimit = units::current::ampere_t{supplyCurrentLimit};
+    rightConfig.CurrentLimits.StatorCurrentLimit = units::current::ampere_t{statorCurrentLimit};
     rightConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
     rightConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-    rightConfig.Slot0.kP = 6;
+    rightConfig.TorqueCurrent.PeakForwardTorqueCurrent = units::current::ampere_t{85};
+    rightConfig.TorqueCurrent.PeakReverseTorqueCurrent = units::current::ampere_t{85};
+    rightConfig.Slot0.kP = 10;
     rightConfig.Slot0.kI = 0;
     rightConfig.Slot0.kD = 0;
-    rightConfig.Slot0.kV = 1;
+    rightConfig.Slot0.kV = 0;
     rightConfig.Slot0.kS = 0;
     
     rightMotor.GetConfigurator().Apply(rightConfig);
@@ -161,7 +170,7 @@ void Robot::EnabledPeriodic()
     double motorSpeed = (leftMotor.GetVelocity().GetValueAsDouble() + rightMotor.GetVelocity().GetValueAsDouble())/2;
 
     if(final > 160 && final < 900){
-        pedalVal = (final-177)/690; // SDL_CONTROLLER_AXIS_LEFTY
+        pedalVal = (final-180)/690; // SDL_CONTROLLER_AXIS_LEFTY
     if(pedalVal>1){
         pedalVal = 1;
     } else if(pedalVal<0){
@@ -201,6 +210,10 @@ void Robot::EnabledPeriodic()
     cout << leftMotor.GetVelocity();
     printf("\n");
 
+    cout << "Left Temperature: ";
+    cout << leftMotor.GetDeviceTemp();
+    printf("\n");
+
     cout << "Right Toruqe Current: ";
     cout << rightMotor.GetTorqueCurrent();
     printf("\n");
@@ -221,15 +234,24 @@ void Robot::EnabledPeriodic()
     cout << rightMotor.GetVelocity();
     printf("\n");
 
+    cout << "Right Temperature: ";
+    cout << rightMotor.GetDeviceTemp();
+    printf("\n");
+
+
     if(pedalVal > 0.4){
         double upperMappedPedal = (pedalVal-0.4)/0.6;
-        torqueReq.Output = units::current::ampere_t{upperMappedPedal*22};
+        torqueReq.Output = units::current::ampere_t{upperMappedPedal*supplyCurrentLimit};
         leftMotor.SetControl(torqueReq);
         rightMotor.SetControl(torqueReq);
     }else if(pedalVal <=0.4 && pedalVal >= 0.3) {
         leftMotor.SetControl(controls::CoastOut{});
         rightMotor.SetControl(controls::CoastOut{});
-    } else {
+    } else if(motorSpeed < 5 && pedalVal < 0.1){
+        leftMotor.SetControl(controls::CoastOut{});
+        rightMotor.SetControl(controls::CoastOut{});
+        
+    }else {
         if(motorSpeed >0){
             velocityReq.Velocity = units::angular_velocity::revolutions_per_minute_t{pedalVal*6000};
         } else {
